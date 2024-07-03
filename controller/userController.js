@@ -141,6 +141,36 @@ exports.changePassword = async (req, res) => {
         return res.status(500).json({ msg: 'Server error' });
     }
 };
+// Update user profile
+exports.updateUserProfile = async (req, res) => {
+    const { userId, name, email } = req.body;
+
+    try {
+        // Find the user by ID
+        let user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+
+        // Check if the email is already taken by another user
+        const existingUser = await User.findOne({ email });
+        if (existingUser && existingUser.id !== userId) {
+            return res.status(400).json({ msg: 'Email is already taken' });
+        }
+
+        // Update the user's name and email
+        user.name = xss(name);
+        user.email = xss(email);
+
+        // Save the updated user data
+        await user.save();
+
+        res.status(200).json({ msg: 'Profile updated successfully', user: { id: user.id, name: user.name, email: user.email } });
+    } catch (err) {
+        console.error('Error updating profile:', err);
+        res.status(500).json({ msg: 'Server error' });
+    }
+};
 
 // Login user
 exports.loginUser = async (req, res) => {
