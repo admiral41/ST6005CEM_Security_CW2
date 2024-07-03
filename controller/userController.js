@@ -108,6 +108,39 @@ exports.verifyEmail = async (req, res) => {
     }
 };
 
+// Change user password (new method)
+exports.changePassword = async (req, res) => {
+    const { userId, newPassword } = req.body;
+    try {
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+        if (!user.isVerified) {
+            return res.status(403).json({ msg: 'Please verify your email before logging in.' });
+        }
+        // Check if the new password matches any password in the history
+        const isPasswordUsedBefore = await Promise.all(
+            user.passwordHistory.map(async (oldPassword) => {
+                return await bcrypt.compare(newPassword, oldPassword);
+            })
+        );
+        if (isPasswordUsedBefore.includes(true)) {
+            return res.status(400).json({ msg: 'You cannot reuse your previous passwords' });
+        }
+        // Hash the new password and save it
+        const salt = await bcrypt.genSalt(12);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+        user.password = hashedPassword;
+        user.passwordHistory.push(hashedPassword);
+        user.passwordUpdatedAt = Date.now();
+        await user.save();
+        return res.status(200).json({ msg: 'Password successfully updated' });
+    } catch (err) {
+        console.error('Error changing password:', err);
+        return res.status(500).json({ msg: 'Server error' });
+    }
+};
 
 // Login user
 exports.loginUser = async (req, res) => {
