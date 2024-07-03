@@ -8,6 +8,34 @@ const requestIp = require('request-ip');
 const sendEmail = require('../middleware/sendEmail');
 const crypto = require('crypto');
 
+// Function to get geolocation from IP
+const getGeolocation = async (ip) => {
+    try {
+        const response = await axios.get(`https://api.ipgeolocation.io/ipgeo?apiKey=${process.env.ABSTRACT_API_KEY}&ip=${ip}`);
+        return {
+            city: response.data.city,
+            country: response.data.country_name,
+            latitude: response.data.latitude,
+            longitude: response.data.longitude
+        };
+    } catch (error) {
+        console.error("Error fetching geolocation:", error);
+        return { city: "unknown", country: "unknown", latitude: null, longitude: null };
+    }
+};
+
+// Function to get the real IP address
+const getRealIp = (req) => {
+    let ip = requestIp.getClientIp(req);
+    if (req.headers['x-forwarded-for']) {
+        ip = req.headers['x-forwarded-for'].split(',')[0];
+    }
+    if (ip === '::1' || ip === '127.0.0.1') {
+        ip = '27.34.90.106'; // Replace with your actual IP for testing purposes
+    }
+    return ip;
+};
+
 // Register user
 exports.registerUser = async (req, res) => {
     const errors = validationResult(req);
@@ -58,6 +86,30 @@ exports.registerUser = async (req, res) => {
         res.status(500).send('Server error');
     }
 };
+exports.verifyEmail = async (req, res) => {
+    try {
+        const { verificationToken } = req.params;
+        const user = await User.findOne({ verificationToken });
+
+        if (!user) {
+            return res.status(400).json({ msg: 'Invalid or expired verification link.' });
+        }
+
+        // Update the user's verification status
+        user.isVerified = true;
+        user.verificationToken = undefined;
+
+        await user.save();
+
+        res.status(200).json({ msg: 'Email verified successfully. You can now log in.' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+};
+
+
+// Login user
 exports.loginUser = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
