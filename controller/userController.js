@@ -299,3 +299,30 @@ exports.loginUser = async (req, res) => {
         res.status(500).send('Server error');
     }
 };
+
+
+// Unlock user account
+exports.unlockAccount = async (req, res) => {
+    try {
+        const { resetToken } = req.params;
+        const user = await User.findOne({ resetToken });
+
+        if (!user) {
+            return res.status(400).json({ msg: 'Invalid or expired unlock link.' });
+        }
+
+        if (!user.accountLocked) {
+            return res.status(400).json({ msg: 'This unlock link has already been used. Your account is already unlocked.' });
+        }
+
+        user.accountLocked = false;
+        user.failedLoginAttempts = 0;
+        user.resetToken = undefined; 
+        await user.save();
+
+        return res.status(200).json({ msg: 'Account successfully unlocked. You can now log in.' });
+    } catch (err) {
+        console.error(err.message);
+        return res.status(500).send('Server error');
+    }
+};
